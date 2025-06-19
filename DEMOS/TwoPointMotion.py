@@ -1,4 +1,7 @@
 import threading
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from dobot_api import DobotApiDashboard, DobotApi, DobotApiMove, MyType,alarmAlarmJsonFile
 from time import sleep
 import numpy as np
@@ -98,87 +101,17 @@ def ClearRobotError(dashboard: DobotApiDashboard):
                             print("机器告警 Servo errorid",i,item["zh_CN"]["description"])
                             break  
                        
-                    print("尝试清除错误...")
-                    dashboard.ClearError()
-                    sleep(0.01)
-                    dashboard.Continue()
+                    choose = input("输入1, 将清除错误, 机器继续运行: ")     
+                    if  int(choose)==1:
+                        dashboard.ClearError()
+                        sleep(0.01)
+                        dashboard.Continue()
 
       else:  
          if int(enableStatus_robot[0])==1 and int(algorithm_queue[0])==0:
             dashboard.Continue()
       globalLockValue.release()
       sleep(5)
-
-def move_parts(matrix1_start, matrix2_start, move, dashboard):
-    # 定义矩阵间距
-    matrix_spacing = -32
-
-    parts_moved = 0
-    for row in range(3):
-        for col in range(3):
-            if parts_moved >= 9:
-                break
-
-            # 计算第一个矩阵的抓取位置
-            pick_location = [
-                matrix1_start[0] + col * matrix_spacing,
-                matrix1_start[1] + row * matrix_spacing,
-                matrix1_start[2],
-                matrix1_start[3]
-            ]
-
-            # 计算第二个矩阵的放置位置
-            place_location = [
-                matrix2_start[0] + col * matrix_spacing,
-                matrix2_start[1] + row * matrix_spacing,
-                matrix2_start[2],
-                matrix2_start[3]
-            ]
-
-            # 抬高 jump_height
-            jump_height = 50
-            jump_location = [pick_location[0], pick_location[1], pick_location[2] + jump_height, pick_location[3]]
-            RunPoint(move, jump_location)
-            WaitArrive(jump_location)
-
-            print(f"Picking from {pick_location}")
-            RunPoint(move, pick_location)
-            WaitArrive(pick_location)
-            
-            # 开启吸盘 (DO1 ON)
-            print("DO1 ON (开启吸盘)")
-            dashboard.DO(index=1, status=1)
-            sleep(1)  # 吸附 1 秒
-            print("DO1 OFF (关闭吸盘)")
-            dashboard.DO(index=1, status=0)
-
-            # 抬高 jump_height
-            RunPoint(move, jump_location)
-            WaitArrive(jump_location)
-
-            # 移动到放置位置上方
-            jump_location = [place_location[0], place_location[1], place_location[2] + jump_height, place_location[3]]
-            RunPoint(move, jump_location)
-            WaitArrive(jump_location)
-
-            print(f"Placing at {place_location}")
-            RunPoint(move, place_location)
-            WaitArrive(place_location)
-
-            # 释放气压 (DO2 ON)
-            print("DO2 ON (释放气压)")
-            dashboard.DO(index=2, status=1)
-            sleep(0.2)  # 释放 0.1 秒
-            print("DO2 OFF (关闭气压)")
-            dashboard.DO(index=2, status=0)
-
-            # 抬高 jump_height
-            RunPoint(move, jump_location)
-            WaitArrive(jump_location)
-
-            parts_moved += 1
-
-    print("移动完成！")
        
 if __name__ == '__main__':
     dashboard, move, feed = ConnectRobot()
@@ -191,17 +124,11 @@ if __name__ == '__main__':
     feed_thread1 = threading.Thread(target=ClearRobotError, args=(dashboard,))
     feed_thread1.setDaemon(True)
     feed_thread1.start()
-
-    print("开始执行 Pick & Place...")
-
-    # 定义第一个矩阵的起始位置
-    matrix1_start = [314, 41, -150, 0]
-
-    # 定义第二个矩阵的起始位置
-    matrix2_start = [314, -100, -150, 0]
-
-    while True:
-        print("Moving parts from Matrix 1 to Matrix 2...")
-        move_parts(matrix1_start, matrix2_start, move, dashboard)
-        print("Moving parts from Matrix 2 to Matrix 1...")
-        move_parts(matrix2_start, matrix1_start, move, dashboard)
+    print("循环执行...")
+    point_a = [350, 50, 0, 200]
+    point_b = [350, -50, 0, 170]
+    while True:   
+        RunPoint(move, point_a)
+        WaitArrive(point_a)
+        RunPoint(move, point_b)
+        WaitArrive(point_b)
