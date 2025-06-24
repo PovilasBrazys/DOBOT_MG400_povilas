@@ -239,6 +239,18 @@ class DobotApiDashboard(DobotApi):
         string = "Tool({:d})".format(index)
         return self.sendRecvMsg(string)
 
+    def SetTool(self, index, x, y, z, r):
+        """
+        Select the calibrated tool coordinate system and set its XYZR values.
+        index : Calibrated index of tool coordinates
+        x : X coordinate of the tool
+        y : Y coordinate of the tool
+        z : Z coordinate of the tool
+        r : R coordinate of the tool
+        """
+        string = "SetTool({:d},{{{:f},{:f},{:f},{:f}}})".format(index, x, y, z, r)
+        return self.sendRecvMsg(string)
+
     def RobotMode(self):
         """
     View the robot status
@@ -447,6 +459,15 @@ class DobotApiDashboard(DobotApi):
 
     def GetPose(self):
         string = "GetPose()"
+        return self.sendRecvMsg(string)
+
+    def GetPoseInFrame(self, user_index: int, tool_index: int):
+        """
+    Get robot pose in a specified user frame and tool frame.
+    user_index: User coordinate system index (Value range: 0~9)
+    tool_index: Tool coordinate system index (Value range: 0~9)
+    """
+        string = "GetPose({:d},{:d})".format(user_index, tool_index)
         return self.sendRecvMsg(string)
 
     def EmergencyStop(self):

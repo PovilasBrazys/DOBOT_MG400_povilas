@@ -1,9 +1,11 @@
 import threading
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from time import sleep
 from robot_control import ConnectRobot, RunPoint, WaitArrive, GetFeed, ClearRobotError
+
+
 
 if __name__ == '__main__':
     dashboard, move, feed = ConnectRobot()
@@ -16,11 +18,24 @@ if __name__ == '__main__':
     feed_thread1 = threading.Thread(target=ClearRobotError, args=(dashboard,))
     feed_thread1.setDaemon(True)
     feed_thread1.start()
+    dashboard.Tool(8)
+    dashboard.SetTool(8, 53, 0, 0, 0)
     print("循环执行...")
-    point_a = [350, 50, 0, 200]
-    point_b = [350, -50, 0, 170]
+    point_a = [300, 100, -150, 200]
+    point_b = [300, -100, -150, 170]
+    dashboard.SpeedFactor(10)
     while True:
-        RunPoint(move, point_a)
+        move.MovL(point_a[0], point_a[1], point_a[2], point_a[3])
         WaitArrive(point_a)
-        RunPoint(move, point_b)
+        
+        print("GetPose")
+        angle_data = dashboard.GetPose()
+        print(angle_data)
+        
+        move.MovL(point_b[0], point_b[1], point_b[2], point_b[3])
         WaitArrive(point_b)
+        
+        print("GetPose")
+        angle_data = dashboard.GetPose()
+        print(angle_data)
+ 
