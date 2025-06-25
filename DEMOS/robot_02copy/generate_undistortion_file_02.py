@@ -3,7 +3,7 @@ import numpy as np
 import glob
 import os
 
-from module.settings import session_folder
+from module.settings import session_folder, calibration_capture_folder
 
 # Define chessboard parameters
 # Make sure these match the chessboard used in your photos
@@ -25,7 +25,7 @@ imgpoints = [] # 2d points in image plane (the detected corner locations)
 # --- IMPORTANT: SET YOUR IMAGE DIRECTORY HERE ---
 # Replace this path with the actual path to your calibration photos.
 # Example: 'd:\\Povilas\\GIT_DOBOT\\DOBOT_MG400_povilas\\DEMOS\\robot_02\\calibration_images\\session_20250623_203239'
-image_dir = 'd:\\Dobot\\Dobot_projektai\\DOBOT_MG400_povilas\\DEMOS\\robot_02copy\\calibration_images\\' + session_folder
+image_dir = calibration_capture_folder + session_folder
 # ------------------------------------------------
 
 # Get list of images
@@ -162,10 +162,10 @@ if ret:
             # Crop the image based on the ROI
             x, y, w, h = roi
             dst = dst[y:y+h, x:x+w]
-
-            output_undistorted_path = os.path.join(image_dir, 'undistorted_example.jpg')
-            cv2.imwrite(output_undistorted_path, dst)
-            print(f"Undistorted example image saved to {output_undistorted_path}")
+            #generate undistorted image
+            #output_undistorted_path = os.path.join(image_dir, 'undistorted_example.jpg')
+            #cv2.imwrite(output_undistorted_path, dst)
+            #print(f"Undistorted example image saved to {output_undistorted_path}")
 
             # Optional: Display original and undistorted images
             # cv2.imshow('Original Image', img)

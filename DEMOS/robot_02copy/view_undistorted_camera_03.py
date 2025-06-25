@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import os
-from module.settings import session_folder
+from module.settings import session_folder, calibration_capture_folder
 
 def get_reference_pose(mtx, dist, chessboard_image_path, pattern_size=(7, 9), square_size_cm=1.0):
     """

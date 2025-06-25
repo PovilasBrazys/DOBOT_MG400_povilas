@@ -224,13 +224,17 @@ def robot_motion(move, path, stop_event, output_dir, cam, max_photos=21, motion_
 
 def main():
     session_name = datetime.now().strftime("session_%Y%m%d_%H%M%S")
-    output_dir = os.path.join("..", "calibration_images", session_name)
+    output_dir = os.path.join(script_dir, "calibration_images", session_name)
     os.makedirs(output_dir, exist_ok=True)
 
     # Connect robot
     dashboard, move, feed = connect_robot()
     dashboard.EnableRobot()
     print("Robot enabled!")
+    
+    dashboard.Tool(8)
+    # Assuming the camera is mounted 53mm along the Z-axis of the tool frame
+    dashboard.SetTool(8, 53, 0, 0, 0)
 
     # Start feedback and error clearing threads
     feed_thread = threading.Thread(target=get_feed, args=(feed,), daemon=True)
@@ -327,7 +331,17 @@ def main():
     cv2.destroyAllWindows()
     dashboard.DisableRobot()
     print("Resources released and robot disabled.")
-
+    
+    # Update session_folder in settings.py
+    settings_file_path = os.path.join(script_dir, "module", "settings.py")
+    with open(settings_file_path, "r") as f:
+        settings_content = f.read()
+    
+    new_settings_content = re.sub(r"session_folder = '.*'", f"session_folder = '{session_name}'", settings_content)
+    
+    with open(settings_file_path, "w") as f:
+        f.write(new_settings_content)
+    
 
 if __name__ == "__main__":
     main()
