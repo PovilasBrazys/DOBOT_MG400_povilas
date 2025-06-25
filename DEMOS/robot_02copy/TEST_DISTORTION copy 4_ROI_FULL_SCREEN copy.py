@@ -1,6 +1,12 @@
 import cv2
 import numpy as np
 import os
+import threading
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+from time import sleep
+from robot_control_module import ConnectRobot, RunPoint, WaitArrive, GetFeed, ClearRobotError
+
 
 from module.settings import session_folder, calibration_capture_folder
 
@@ -8,6 +14,7 @@ from module.settings import session_folder, calibration_capture_folder
 calibration_dir = calibration_capture_folder + session_folder
 image_path = os.path.join(calibration_dir, 'image001.jpg')
 calibration_file = os.path.join(calibration_dir, 'calibration_data.npz')
+
 
 # Verify file paths
 print(f"Checking image path: {os.path.exists(image_path)}")
@@ -126,6 +133,38 @@ if ret:
     def mouse_callback(event, u, v, flags, param):
         # Access the necessary variables (read-only)
         global view_width_cm, view_height_cm, pixels_per_cm_x, pixels_per_cm_y, img_w, img_h, dst
+        if event == cv2.EVENT_LBUTTONDOWN:
+            if pixels_per_cm_x is not None and pixels_per_cm_y is not None:
+                # Calculate pixel offset from center (image center is at img_w/2, img_h/2)
+                # u, v are pixel coordinates from top-left corner
+                pixel_offset_u = u - img_w / 2.0
+                pixel_offset_v = v - img_h / 2.0
+
+                # Convert pixel offset to cm offset
+                # User coordinate system: X+ top, X- bottom; Y+ left, Y- right
+                # Image v increases down, so for robot X (vertical), we negate the v offset
+                # Image u increases right, so for robot Y (horizontal), we negate the u offset
+                robot_x_cm = -pixel_offset_v / pixels_per_cm_y
+                robot_y_cm = -pixel_offset_u / pixels_per_cm_x
+
+                # Display coordinates on the image
+                # Create a temporary copy to draw on
+                img_display = dst.copy()
+                coord_text = f"Robot X: {robot_x_cm:.2f} cm, Robot Y: {robot_y_cm:.2f} cm"
+                print(robot_x_cm)
+                print(robot_y_cm)
+                cv2.putText(img_display, coord_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+
+
+                # Draw a crosshair at the image center
+                center_x, center_y = img_w // 2, img_h // 2
+                cv2.line(img_display, (center_x - 10, center_y), (center_x + 10, center_y), (0, 0, 255), 1)
+                cv2.line(img_display, (center_x, center_y - 10), (center_x, center_y + 10), (0, 0, 255), 1)
+
+                # Draw markers at the origin (center of the view)
+                cv2.circle(img_display, (center_x, center_y), 5, (255, 0, 0), -1) # Blue circle at origin
+
+                cv2.imshow('Undistorted Image with Coordinates', img_display)
 
         if event == cv2.EVENT_MOUSEMOVE:
             if pixels_per_cm_x is not None and pixels_per_cm_y is not None:
@@ -146,6 +185,7 @@ if ret:
                 img_display = dst.copy()
                 coord_text = f"Robot X: {robot_x_cm:.2f} cm, Robot Y: {robot_y_cm:.2f} cm"
                 cv2.putText(img_display, coord_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+
 
                 # Draw a crosshair at the image center
                 center_x, center_y = img_w // 2, img_h // 2

@@ -329,7 +329,7 @@ def main():
     # Cleanup
     cam.release()
     cv2.destroyAllWindows()
-    dashboard.DisableRobot()
+    #dashboard.DisableRobot()
     print("Resources released and robot disabled.")
     
     # Update session_folder in settings.py
