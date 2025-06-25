@@ -1,9 +1,10 @@
 import cv2
 import numpy as np
 import os
+from module.settings import session_folder
 
 class CameraModule:
-    def __init__(self, session_folder='session_20250623_221126'):
+    def __init__(self, session_folder=session_folder):
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         self.session_folder = session_folder
         self.calibration_npz_file = os.path.join(self.script_dir, 'calibration_images', self.session_folder, 'calibration_data.npz')
