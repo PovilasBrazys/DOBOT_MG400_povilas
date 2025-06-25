@@ -2,7 +2,9 @@ import cv2
 import numpy as np
 import os
 
-calibration_dir = r'd:\\Dobot\\Dobot_projektai\\DOBOT_MG400_povilas\\DEMOS\\robot_02copy\\calibration_images\\session_20250517_054446'
+from module.settings import session_folder, calibration_capture_folder
+
+calibration_dir = calibration_capture_folder
 image_path = os.path.join(calibration_dir, 'image001.jpg')
 calibration_file = os.path.join(calibration_dir, 'calibration_data.npz')
 
