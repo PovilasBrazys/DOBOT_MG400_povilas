@@ -2,3 +2,4 @@
 *.vscode/
 *__pycache__
 *.idea
+/DEMOS/robot_02copy/calibration_images/

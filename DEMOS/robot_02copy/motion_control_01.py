@@ -9,7 +9,7 @@ import re
 import pandas as pd
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-from robot_control import ConnectRobot, RunPoint, WaitArrive, GetFeed, ClearRobotError, current_actual, globalLockValue
+from robot_control_module import ConnectRobot, RunPoint, WaitArrive, GetFeed, ClearRobotError, current_actual, globalLockValue
 
 def parse_pose_string(pose_str):
     """Parses the robot pose string into a list of floats."""
