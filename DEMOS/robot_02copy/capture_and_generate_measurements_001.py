@@ -13,6 +13,7 @@ script_dir = os.path.dirname(__file__)
 project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))  # Go up three levels
 sys.path.append(project_root)
 from dobot_api import DobotApiDashboard, DobotApi, DobotApiMove, MyType
+import math
 
 # Global variables for robot feedback
 current_actual = None
@@ -21,6 +22,44 @@ enableStatus_robot = None
 robotErrorState = False
 globalLockValue = threading.Lock()
 
+# setZ for camera calibration
+setZ = 0
+# setZ=0
+cameraX_offset = 53
+Y_offset = -3.81
+
+
+def true_camPointXY_S(point, cameraX_offset):
+    x = point[0] + cameraX_offset
+    y = point[1]
+    deg = math.degrees(math.atan(y / x))
+    print(deg)
+
+    x1 = cameraX_offset * math.cos(math.radians(deg))
+    y1 = cameraX_offset * math.sin(math.radians(deg))
+    print("x1:", x1)
+    print("y1:", y1)
+    x2 = x - x1
+    y2 = y - y1
+
+    print("x2:", x2)
+    print("y2:", y2)
+    point[0] = x2
+    point[1] = y2
+    return point
+    
+
+def true_camPointXY(point, cameraX_offset):
+    x = point[0] + cameraX_offset
+    y = point[1]
+
+    angle_rad = math.atan2(y, x)
+    cos_angle = math.cos(angle_rad)
+    sin_angle = math.sin(angle_rad)
+
+    point[0] = x - cameraX_offset * cos_angle
+    point[1] = y - cameraX_offset * sin_angle
+    return point
 
 def connect_robot():
     """Connect to the Dobot robot."""
@@ -33,6 +72,8 @@ def connect_robot():
         dashboard = DobotApiDashboard(ip, dashboardPort)
         move = DobotApiMove(ip, movePort)
         feed = DobotApi(ip, feedPort)
+        
+        dashboard.SpeedFactor(10)
         print("Robot connected!")
         return dashboard, move, feed
     except Exception as e:
@@ -119,7 +160,7 @@ def generate_grid_path(center_x, center_y, size_x, size_y, step):
     path = []
     for y in np.arange(center_y - size_y / 2, center_y + size_y / 2 + step, step):
         for x in np.arange(center_x - size_x / 2, center_x + size_x / 2 + step, step):
-            path.append([x, y, 0, 0])  # Z=0, R=0
+            path.append(true_camPointXY([x, y, setZ, 0], cameraX_offset))  # Z=0, R=0
     return path
 
 
@@ -185,7 +226,7 @@ def robot_motion(move, path, stop_event, output_dir, cam, max_photos=21, motion_
     """Execute robot motion and capture images."""
     img_counter = 0
     measurements = []
-    initial_position = [300, 0, 0, 0]
+    initial_position =  true_camPointXY([300, 0, setZ, 0], cameraX_offset)
     run_point(move, initial_position)
     wait_arrive(initial_position)
     with globalLockValue:
@@ -231,10 +272,7 @@ def main():
     dashboard, move, feed = connect_robot()
     dashboard.EnableRobot()
     print("Robot enabled!")
-    
-    dashboard.Tool(8)
-    # Assuming the camera is mounted 53mm along the Z-axis of the tool frame
-    dashboard.SetTool(8, 53, 0, 0, 0)
+
 
     # Start feedback and error clearing threads
     feed_thread = threading.Thread(target=get_feed, args=(feed,), daemon=True)

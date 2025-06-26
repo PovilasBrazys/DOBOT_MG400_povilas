@@ -232,9 +232,10 @@ dashboard.SpeedFactor(10)
 setZ = 0
 # setZ=0
 cameraX_offset = 53
-Y_offset = -3.81
+Y_offset = 1.5
+X_offset = -7
 
-point_a = true_camPointXY( [300, 0, setZ, 0], cameraX_offset)
+point_a = true_camPointXY([300, 0, setZ, 0], cameraX_offset)
 
 move.MovL(point_a[0], point_a[1], point_a[2], point_a[3])
 WaitArrive(point_a)
@@ -347,7 +348,7 @@ if ret:
 
 
                 #point_b = true_camPointXY( [300 + robot_x_cm * 10, robot_y_cm * 10, setZ, 0], cameraX_offset)
-                point_b = [300+cameraX_offset + robot_x_cm * 10, robot_y_cm * 10 + Y_offset, -190, 0]
+                point_b = [300+cameraX_offset + robot_x_cm * 10 + X_offset, robot_y_cm * 10 + Y_offset, -190, 0]
                 print(point_b[0])
                 print(point_b[1])
                 print(robot_x_cm)
