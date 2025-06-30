@@ -7,6 +7,8 @@ from time import sleep
 import numpy as np
 import re
 
+import math
+
 # 全局变量(当前坐标)
 current_actual = None
 algorithm_queue = None
@@ -112,3 +114,22 @@ def ClearRobotError(dashboard: DobotApiDashboard):
                 dashboard.Continue()
         globalLockValue.release()
         sleep(5)
+
+def true_camPointXY(point, cameraX_offset):
+    x = point[0] + cameraX_offset
+    y = point[1]
+    deg = math.degrees(math.atan(y / x))
+    print(deg)
+
+    x1 = cameraX_offset * math.cos(math.radians(deg))
+    y1 = cameraX_offset * math.sin(math.radians(deg))
+    print("x1:", x1)
+    print("y1:", y1)
+    x2 = x - x1
+    y2 = y - y1
+
+    print("x2:", x2)
+    print("y2:", y2)
+    point[0] = x2
+    point[1] = y2
+    return point

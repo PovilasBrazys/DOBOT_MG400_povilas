@@ -1,3 +1,7 @@
-session_folder = 'session_20250625_170845'
+session_folder = 'session_20250630_160009'
 
-calibration_capture_folder = 'd:\\Povilas\\GIT_DOBOT\\DOBOT_MG400_povilas\\DEMOS\\robot_02copy\\calibration_images\\'
+import os
+
+session_folder = 'session_20250630_160009'
+
+calibration_capture_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../calibration_images/')
