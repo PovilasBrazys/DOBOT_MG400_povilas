@@ -8,14 +8,13 @@ if PY3:
 import numpy as np
 import cv2 as cv
 
-# local module
-import video
-from video import presets
-
 
 class App(object):
-    def __init__(self, video_src):
-        self.cam = video.create_capture(video_src, presets['cube'])
+    def __init__(self, video_src=0):
+        self.cam = cv.VideoCapture(video_src)
+        if not self.cam.isOpened():
+            print("Error: Unable to open video source", video_src)
+            sys.exit(1)
         _ret, self.frame = self.cam.read()
         cv.namedWindow('camshift')
         cv.setMouseCallback('camshift', self.onmouse)
@@ -42,11 +41,11 @@ class App(object):
     def show_hist(self):
         bin_count = self.hist.shape[0]
         bin_w = 24
-        img = np.zeros((256, bin_count*bin_w, 3), np.uint8)
+        img = np.zeros((256, bin_count * bin_w, 3), np.uint8)
         for i in xrange(bin_count):
             h = int(self.hist[i])
-            cv.rectangle(img, (i*bin_w+2, 255), ((i+1)*bin_w-2, 255-h),
-                         (int(180.0*i/bin_count), 255, 255), -1)
+            cv.rectangle(img, (i * bin_w + 2, 255), ((i + 1) * bin_w - 2, 255 - h),
+                         (int(180.0 * i / bin_count), 255, 255), -1)
         img = cv.cvtColor(img, cv.COLOR_HSV2BGR)
         cv.imshow('hist', img)
 
@@ -57,19 +56,15 @@ class App(object):
 
         h, s, v = cv.split(hsv)
 
-        # Adaptive thresholds for S and V with some margin for lighting variation
-        # Here we set saturation threshold moderately high but allow low saturation pixels if hue is strong
+        # Thresholds to keep saturation and brightness in reasonable range
         s_thresh_low = 40
         v_thresh_low = 40
 
-        # Create masks with thresholds
         mask_s = cv.inRange(s, s_thresh_low, 255)
         mask_v = cv.inRange(v, v_thresh_low, 255)
 
-        # Combine masks - keep pixels with sufficient saturation and brightness
         mask = cv.bitwise_and(mask_s, mask_v)
 
-        # Morphological operations to clean up noise
         kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (5, 5))
         mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
         mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
@@ -79,6 +74,10 @@ class App(object):
     def run(self):
         while True:
             _ret, self.frame = self.cam.read()
+            if not _ret:
+                print("Failed to grab frame")
+                break
+
             vis = self.frame.copy()
 
             hsv, mask = self.preprocess(self.frame)
@@ -118,6 +117,7 @@ class App(object):
             if ch == ord('b'):
                 self.show_backproj = not self.show_backproj
 
+        self.cam.release()
         cv.destroyAllWindows()
 
 
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     print(__doc__)
     import sys
     try:
-        video_src = sys.argv[1]
+        video_src = int(sys.argv[1])
     except:
         video_src = 0
     App(video_src).run()
