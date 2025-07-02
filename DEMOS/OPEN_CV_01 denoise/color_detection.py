@@ -28,11 +28,14 @@ class ColorDetectionApp(object):
             print("Error: Could not read from camera")
             sys.exit(1)
 
-        # Create windows
+        # Create windows (Controls, Histogram, Mask unchanged)
         cv.namedWindow('Color Detection', cv.WINDOW_NORMAL)
         cv.namedWindow('Controls', cv.WINDOW_NORMAL)
         cv.namedWindow('Histogram', cv.WINDOW_NORMAL)
         cv.namedWindow('Mask', cv.WINDOW_NORMAL)
+
+        # Set fullscreen for 'Color Detection' window (borderless fullscreen)
+        cv.setWindowProperty('Color Detection', cv.WND_PROP_FULLSCREEN, cv.WINDOW_FULLSCREEN)
 
         # Set mouse callback
         cv.setMouseCallback('Color Detection', self.onmouse)
@@ -81,6 +84,50 @@ class ColorDetectionApp(object):
 
         # Create trackbars
         self.create_trackbars()
+
+    def show_fullscreen_camera_feed(self):
+        """
+        Show camera feed on the 'Color Detection' window in borderless fullscreen mode,
+        draw a red dot cursor at the center and overlay RGB values of center pixel.
+        """
+        while True:
+            ret, frame = self.cam.read()
+            if not ret:
+                print("Error: Could not read frame")
+                break
+
+            height, width, _ = frame.shape
+            center_x = width // 2
+            center_y = height // 2
+
+            # Get BGR values at center pixel
+            b, g, r = frame[center_y, center_x]
+            rgb_text = f"RGB: ({r}, {g}, {b})"
+
+            # Overlay RGB text
+            cv.putText(
+                frame,
+                rgb_text,
+                (10, 30),
+                cv.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (255, 255, 255),
+                2,
+                cv.LINE_AA
+            )
+
+            # Draw red dot at center
+            cv.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)
+
+            # Show the frame in 'Color Detection' window (fullscreen)
+            cv.imshow('Color Detection', frame)
+
+            # Exit on ESC key press
+            if cv.waitKey(1) & 0xFF == 27:
+                break
+
+        self.cam.release()
+        cv.destroyAllWindows()
 
     def create_trackbars(self):
         """Create control trackbars"""
@@ -488,6 +535,16 @@ class ColorDetectionApp(object):
             if not ret:
                 print("Error: Could not read frame")
                 break
+
+            adjusted_frame = self.adjust_contrast_brightness(self.frame)
+            hsv = cv.cvtColor(adjusted_frame, cv.COLOR_BGR2HSV)
+            vis = adjusted_frame.copy()
+
+            # Draw red dot at center of frame
+            height, width = vis.shape[:2]
+            center_x = width // 2
+            center_y = height // 2
+            cv.circle(vis, (center_x, center_y), 5, (0, 0, 255), -1)  # Red dot
 
             # Apply contrast and brightness adjustments
             adjusted_frame = self.adjust_contrast_brightness(self.frame)
