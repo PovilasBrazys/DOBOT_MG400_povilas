@@ -1,0 +1,6 @@
+import os
+
+
+
+script_dir = os.path.dirname(__file__)
+for fn in glob(os.path.join(script_dir, '*.py')):
