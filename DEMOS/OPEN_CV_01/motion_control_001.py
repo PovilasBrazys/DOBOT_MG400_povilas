@@ -80,12 +80,16 @@ def robot_movement_thread(dashboard, move, camera_ready_event, stop_event):
         WaitArrive(point_a)
         print("GetPoseA", dashboard.GetPose())
         sleep(3)
+        move.MovL(point_c[0], point_c[1], point_c[2], point_c[3])
+        WaitArrive(point_c)
+        print("GetPoseC", dashboard.GetPose())
+        sleep(3)
 
 if __name__ == '__main__':
     dashboard, move, feed = ConnectRobot()
     dashboard.EnableRobot()
     
-    point_a = [250, 0, 0, 0]
+    point_a = [335 - 53, 33, 0, 0]
     
     point_b = true_camPointXY([point_a[0], point_a[1], point_a[2], point_a[3]], cameraX_offset)
     move.MovL(point_b[0], point_b[1], point_b[2], point_b[3])
