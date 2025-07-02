@@ -46,23 +46,35 @@ class ColorDetectionApp(object):
         # Color detection parameters
         self.contrast = 50  # 0-100
         self.brightness = 50  # 0-100
-        self.hue_range = 15  # How much hue variation to allow
-        self.sat_min = 50  # Minimum saturation
-        self.val_min = 50  # Minimum value
+        self.hue_range = 20  # How much hue variation to allow
+        self.sat_min = 40  # Minimum saturation
+        self.val_min = 30  # Minimum value (lowered for shadows)
         self.blur_kernel = 5  # Blur kernel size
         self.morph_kernel = 5  # Morphological operations kernel size
 
-        # Color groups for robust detection
+        # Enhanced color groups with tighter ranges to prevent false positives
         self.color_ranges = {
-            'red': [(0, 10), (170, 180)],  # Red wraps around in HSV
-            'orange': [(10, 25)],
+            'red': [(0, 12), (168, 180)],  # Tighter red range
+            'orange': [(12, 25)],  # Clear boundaries
             'yellow': [(25, 35)],
-            'green': [(35, 85)],
-            'cyan': [(85, 95)],
-            'blue': [(95, 125)],
-            'purple': [(125, 145)],
-            'pink': [(145, 170)]
+            'green': [(35, 80)],  # Tighter green range
+            'cyan': [(80, 95)],  # Clear cyan boundary
+            'blue': [(100, 125)],  # Tighter, more specific blue range
+            'purple': [(125, 145)],  # Clear purple range
+            'pink': [(145, 168)]  # Clear pink range
         }
+
+        # Advanced detection parameters
+        self.shadow_detection = True  # Detect darker tones of same color
+        self.adaptive_range = True  # Adapt range based on lighting
+        self.false_positive_filter = True  # Enhanced filtering for false positives
+        self.shape_completion = True  # Fill gaps in 3D object detection
+        self.multi_exposure_analysis = False  # Analyze multiple exposure levels
+
+        # 3D object detection parameters
+        self.shadow_tolerance = 0.3  # How much darker shadows can be (30% of original value)
+        self.hue_shift_tolerance = 8  # Hue shift tolerance for shadows (degrees)
+        self.gradient_threshold = 30  # Edge gradient threshold for shape completion
 
         self.selected_color = None
         self.current_color_range = None
@@ -77,8 +89,11 @@ class ColorDetectionApp(object):
         cv.createTrackbar('Hue Range', 'Controls', self.hue_range, 50, self.on_hue_range_change)
         cv.createTrackbar('Min Saturation', 'Controls', self.sat_min, 255, self.on_sat_min_change)
         cv.createTrackbar('Min Value', 'Controls', self.val_min, 255, self.on_val_min_change)
-        cv.createTrackbar('Blur Kernel', 'Controls', self.blur_kernel, 15, self.on_blur_change)
-        cv.createTrackbar('Morph Kernel', 'Controls', self.morph_kernel, 15, self.on_morph_change)
+        cv.createTrackbar('Shadow Tolerance', 'Controls', int(self.shadow_tolerance * 100), 100, self.on_shadow_change)
+        cv.createTrackbar('Hue Shift Tolerance', 'Controls', self.hue_shift_tolerance, 30, self.on_hue_shift_change)
+        cv.createTrackbar('Shape Completion', 'Controls', 1 if self.shape_completion else 0, 1, self.on_shape_change)
+        cv.createTrackbar('False Positive Filter', 'Controls', 1 if self.false_positive_filter else 0, 1,
+                          self.on_fp_change)
 
     def on_contrast_change(self, val):
         self.contrast = val
@@ -102,6 +117,18 @@ class ColorDetectionApp(object):
 
     def on_morph_change(self, val):
         self.morph_kernel = max(1, val)
+
+    def on_shadow_change(self, val):
+        self.shadow_tolerance = val / 100.0
+
+    def on_hue_shift_change(self, val):
+        self.hue_shift_tolerance = val
+
+    def on_shape_change(self, val):
+        self.shape_completion = bool(val)
+
+    def on_fp_change(self, val):
+        self.false_positive_filter = bool(val)
 
     def onmouse(self, event, x, y, flags, param):
         """Handle mouse events for region selection"""
@@ -130,7 +157,7 @@ class ColorDetectionApp(object):
                 self.analyze_selected_region()
 
     def analyze_selected_region(self):
-        """Analyze the selected region to determine dominant color"""
+        """Advanced analysis with false positive filtering and shadow detection"""
         if not self.track_window:
             return
 
@@ -138,17 +165,64 @@ class ColorDetectionApp(object):
         hsv = cv.cvtColor(self.frame, cv.COLOR_BGR2HSV)
         roi = hsv[y:y + h, x:x + w]
 
-        # Calculate histogram of hue channel
-        hist = cv.calcHist([roi], [0], None, [180], [0, 180])
+        # Calculate detailed histogram analysis
+        hist_h = cv.calcHist([roi], [0], None, [180], [0, 180])
+        hist_s = cv.calcHist([roi], [1], None, [256], [0, 256])
+        hist_v = cv.calcHist([roi], [2], None, [256], [0, 256])
 
-        # Find dominant hue
-        dominant_hue = np.argmax(hist)
+        # Find dominant hue with confidence scoring
+        dominant_hue = np.argmax(hist_h)
+        hue_confidence = hist_h[dominant_hue] / np.sum(hist_h)
 
-        # Determine color group
+        # Find dominant saturation and value for better thresholding
+        dominant_sat = np.argmax(hist_s)
+        dominant_val = np.argmax(hist_v)
+
+        # Analyze color distribution to avoid false positives
+        significant_hues = []
+        for i in range(180):
+            if hist_h[i] > np.max(hist_h) * 0.1:  # At least 10% of max
+                significant_hues.append(i)
+
+        # Check for color purity (avoid mixed/ambiguous colors)
+        if len(significant_hues) > 20:  # Too many significant hues = noisy/mixed color
+            print("Warning: Selected region contains mixed colors. Try selecting a more uniform area.")
+            return
+
+        # Enhanced dominant hue calculation considering shadows
+        hue_candidates = []
+        for hue in significant_hues:
+            weight = hist_h[hue][0]
+            hue_candidates.append((hue, weight))
+
+        # Sort by weight and analyze top candidates
+        hue_candidates.sort(key=lambda x: x[1], reverse=True)
+
+        if len(hue_candidates) > 1:
+            # Check if secondary peaks are likely shadows of main color
+            main_hue = hue_candidates[0][0]
+            for candidate_hue, weight in hue_candidates[1:]:
+                hue_diff = abs(candidate_hue - main_hue)
+                if hue_diff > 90:  # Handle wraparound
+                    hue_diff = 180 - hue_diff
+
+                if hue_diff <= self.hue_shift_tolerance and weight > hue_candidates[0][1] * 0.3:
+                    print(f"Detected shadow variant at hue {candidate_hue}")
+
+        dominant_hue = hue_candidates[0][0]
+
+        # Store additional color properties for better detection
+        self.dominant_sat = dominant_sat
+        self.dominant_val = dominant_val
+        self.hue_confidence = hue_confidence[0]
+
+        # Determine color group with stricter criteria
         self.selected_color = self.get_color_name(dominant_hue)
         self.current_color_range = self.get_color_range(dominant_hue)
 
-        print(f"Detected color: {self.selected_color} (Hue: {dominant_hue})")
+        print(f"Detected color: {self.selected_color} (Hue: {dominant_hue}, Confidence: {self.hue_confidence:.2f})")
+        print(f"Dominant S/V: {dominant_sat}/{dominant_val}")
+        print(f"Detection range: {self.current_color_range}")
 
     def get_color_name(self, hue):
         """Get color name from hue value"""
@@ -173,7 +247,7 @@ class ColorDetectionApp(object):
             return [(lower_hue, upper_hue)]
 
     def adjust_contrast_brightness(self, img):
-        """Apply contrast and brightness adjustments"""
+        """Simple contrast and brightness adjustment"""
         alpha = self.contrast / 50.0  # Contrast control (1.0-3.0)
         beta = (self.brightness - 50) * 2  # Brightness control (-100 to 100)
 
@@ -181,34 +255,166 @@ class ColorDetectionApp(object):
         return adjusted
 
     def create_mask(self, hsv):
-        """Create mask for color detection with improved robustness"""
+        """Advanced mask creation for 3D objects with shadow detection and false positive filtering"""
         if not self.current_color_range:
             return np.zeros(hsv.shape[:2], dtype=np.uint8)
 
-        # Create mask for each hue range
-        masks = []
+        # Create base mask with primary color ranges
+        base_masks = []
         for hue_range in self.current_color_range:
             lower = np.array([hue_range[0], self.sat_min, self.val_min])
             upper = np.array([hue_range[1], 255, 255])
             mask = cv.inRange(hsv, lower, upper)
-            masks.append(mask)
+            base_masks.append(mask)
 
-        # Combine masks
-        final_mask = masks[0]
-        for mask in masks[1:]:
-            final_mask = cv.bitwise_or(final_mask, mask)
+        # Combine base masks
+        primary_mask = base_masks[0]
+        for mask in base_masks[1:]:
+            primary_mask = cv.bitwise_or(primary_mask, mask)
 
-        # Apply morphological operations to clean up the mask
+        # Create shadow/darker tone masks for 3D object detection
+        shadow_masks = []
+        if self.shadow_detection and hasattr(self, 'dominant_val'):
+            for hue_range in self.current_color_range:
+                # Calculate shadow value threshold
+                shadow_val_min = max(10, int(self.dominant_val * self.shadow_tolerance))
+
+                # Allow slight hue shift in shadows
+                shadow_hue_min = max(0, hue_range[0] - self.hue_shift_tolerance)
+                shadow_hue_max = min(179, hue_range[1] + self.hue_shift_tolerance)
+
+                # More lenient saturation for shadows
+                shadow_sat_min = max(10, self.sat_min // 2)
+
+                lower_shadow = np.array([shadow_hue_min, shadow_sat_min, shadow_val_min])
+                upper_shadow = np.array([shadow_hue_max, 255, self.val_min + 20])
+
+                shadow_mask = cv.inRange(hsv, lower_shadow, upper_shadow)
+                shadow_masks.append(shadow_mask)
+
+        # Combine shadow masks
+        if shadow_masks:
+            combined_shadow_mask = shadow_masks[0]
+            for mask in shadow_masks[1:]:
+                combined_shadow_mask = cv.bitwise_or(combined_shadow_mask, mask)
+
+            # Only include shadow pixels that are connected to primary color regions
+            shadow_mask_filtered = self.filter_shadow_mask(primary_mask, combined_shadow_mask)
+            final_mask = cv.bitwise_or(primary_mask, shadow_mask_filtered)
+        else:
+            final_mask = primary_mask
+
+        # False positive filtering
+        if self.false_positive_filter:
+            final_mask = self.apply_false_positive_filter(final_mask, hsv)
+
+        # Shape completion for 3D objects
+        if self.shape_completion:
+            final_mask = self.complete_object_shape(final_mask)
+
+        # Standard morphological cleanup
         if self.blur_kernel > 1:
             final_mask = cv.medianBlur(final_mask, self.blur_kernel)
 
         if self.morph_kernel > 1:
             kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE,
                                               (self.morph_kernel, self.morph_kernel))
-            final_mask = cv.morphologyEx(final_mask, cv.MORPH_OPEN, kernel)
             final_mask = cv.morphologyEx(final_mask, cv.MORPH_CLOSE, kernel)
+            final_mask = cv.morphologyEx(final_mask, cv.MORPH_OPEN, kernel)
 
         return final_mask
+
+    def filter_shadow_mask(self, primary_mask, shadow_mask):
+        """Filter shadow mask to only include regions connected to primary color"""
+        # Dilate primary mask to create connection regions
+        kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (7, 7))
+        dilated_primary = cv.dilate(primary_mask, kernel, iterations=2)
+
+        # Only keep shadow regions that overlap with dilated primary regions
+        connected_shadows = cv.bitwise_and(shadow_mask, dilated_primary)
+
+        return connected_shadows
+
+    def apply_false_positive_filter(self, mask, hsv):
+        """Apply advanced filtering to remove false positives"""
+        # Remove small isolated regions (likely false positives)
+        contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+
+        # Calculate size statistics
+        if len(contours) == 0:
+            return mask
+
+        areas = [cv.contourArea(cnt) for cnt in contours]
+        if len(areas) == 0:
+            return mask
+
+        # Remove regions significantly smaller than the largest
+        max_area = max(areas)
+        min_significant_area = max(100, max_area * 0.1)  # At least 10% of largest or 100 pixels
+
+        filtered_mask = np.zeros_like(mask)
+        for contour in contours:
+            if cv.contourArea(contour) >= min_significant_area:
+                cv.fillPoly(filtered_mask, [contour], 255)
+
+        # Additional spatial coherence filtering
+        # Remove regions that don't have similar color neighbors
+        filtered_mask = self.spatial_coherence_filter(filtered_mask, hsv)
+
+        return filtered_mask
+
+    def spatial_coherence_filter(self, mask, hsv):
+        """Remove isolated regions that don't have color-similar neighbors"""
+        # Create a copy for modification
+        coherent_mask = mask.copy()
+
+        # Find contours
+        contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+
+        for contour in contours:
+            # Get bounding rectangle
+            x, y, w, h = cv.boundingRect(contour)
+
+            # Expand search area
+            search_x = max(0, x - w // 2)
+            search_y = max(0, y - h // 2)
+            search_w = min(hsv.shape[1] - search_x, w * 2)
+            search_h = min(hsv.shape[0] - search_y, h * 2)
+
+            # Analyze neighborhood
+            neighborhood = hsv[search_y:search_y + search_h, search_x:search_x + search_w]
+            region = hsv[y:y + h, x:x + w]
+
+            if neighborhood.size > 0 and region.size > 0:
+                # Calculate color similarity in neighborhood
+                region_mean_hue = np.mean(region[:, :, 0])
+                neighborhood_similar = np.abs(neighborhood[:, :, 0] - region_mean_hue) < self.hue_range
+                similarity_ratio = np.sum(neighborhood_similar) / neighborhood_similar.size
+
+                # Remove region if it's too isolated (less than 20% similar colors in neighborhood)
+                if similarity_ratio < 0.2:
+                    cv.fillPoly(coherent_mask, [contour], 0)
+
+        return coherent_mask
+
+    def complete_object_shape(self, mask):
+        """Fill gaps and complete object shapes for better 3D object detection"""
+        # Use more aggressive closing to connect object parts
+        kernel_large = cv.getStructuringElement(cv.MORPH_ELLIPSE, (15, 15))
+        completed = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel_large)
+
+        # Fill convex hull of large objects to complete shape
+        contours, _ = cv.findContours(completed, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+
+        shape_completed = completed.copy()
+        for contour in contours:
+            area = cv.contourArea(contour)
+            if area > 1000:  # Only for reasonably large objects
+                # Create convex hull
+                hull = cv.convexHull(contour)
+                cv.fillPoly(shape_completed, [hull], 255)
+
+        return shape_completed
 
     def show_histogram(self, hsv, mask):
         """Display 1D histogram of hue values"""
