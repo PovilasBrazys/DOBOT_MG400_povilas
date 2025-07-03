@@ -4,7 +4,13 @@ import os
 import cv2
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from time import sleep
-from robot_control import ConnectRobot, RunPoint, WaitArrive, GetFeed, ClearRobotError, true_camPointXY
+from robot_control_001 import ConnectRobot, RunPoint, WaitArrive, GetFeed, ClearRobotError, true_camPointXY
+
+
+setZ = 0
+cameraX_offset = 53
+
+
 
 def camera_thread(dashboard, move, camera_ready_event, stop_event):
     camera_index = 0
@@ -46,25 +52,68 @@ def camera_thread(dashboard, move, camera_ready_event, stop_event):
             2,  # Thickness
             cv2.LINE_AA
         )
-        
         # Draw red dot at center
-        cv2.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)  # Red dot
+        cv2.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)
 
+
+        # Display the frame
         cv2.imshow(window_name, frame)
 
+        # Check for spacebar to stop
         if cv2.waitKey(1) & 0xFF == ord(' '):
-            stop_event.set()  # Signal all threads to stop
+            stop_event.set()
             break
 
     cap.release()
     cv2.destroyAllWindows()
 
+def robot_movement_thread(dashboard, move, camera_ready_event, stop_event):
+    # Wait for camera to be ready
+    camera_ready_event.wait()
+
+    point_a = [347, 0, setZ, 0]
+    dashboard.SpeedFactor(10)
+
+    point_b = true_camPointXY([point_a[0], 50, setZ, 0], cameraX_offset)
+    point_c = true_camPointXY([point_a[0], -50, setZ, 0], cameraX_offset)
+
+    # Starting point
+    start_point = [370 - cameraX_offset, 33, setZ, 0]
+    dashboard.SpeedFactor(10)
+
+    # Define 3x3 grid parameters
+    x_step = -35  # Move 25mm in negative X direction
+    y_step = -35   # Move 25mm in positive Y direction
+    grid_size = 3
+
+    while not stop_event.is_set():
+        # Iterate through 3x3 grid
+        for y in range(grid_size):
+            for x in range(grid_size):
+                # Calculate new position
+                current_x = start_point[0] + (x * x_step)
+                current_y = start_point[1] + (y * y_step)
+                
+                # Apply camera offset
+                target_point = true_camPointXY([current_x, current_y, setZ, 0], cameraX_offset)
+                
+                # Move to position
+                move.MovL(target_point[0], target_point[1], target_point[2], target_point[3])
+                WaitArrive(target_point)
+                print(f"Position ({x},{y}):", dashboard.GetPose())
+                sleep(3)
+
+                if stop_event.is_set():
+                    return
+
 if __name__ == '__main__':
     dashboard, move, feed = ConnectRobot()
     dashboard.EnableRobot()
     
-    point_a = [347, 0, 0, 0]
-    move.MovL(point_a[0], point_a[1], point_a[2], point_a[3])
+    point_a = [335 - 53, 33, 0, 0]
+    
+    point_b = true_camPointXY([point_a[0], point_a[1], point_a[2], point_a[3]], cameraX_offset)
+    move.MovL(point_b[0], point_b[1], point_b[2], point_b[3])
 
     # Create events for camera readiness and program termination
     camera_ready_event = threading.Event()
@@ -84,6 +133,10 @@ if __name__ == '__main__':
     camera_thread1.daemon = True
     camera_thread1.start()
 
+    # Start robot movement thread
+    robot_thread = threading.Thread(target=robot_movement_thread, args=(dashboard, move, camera_ready_event, stop_event))
+    robot_thread.daemon = True
+    robot_thread.start()
 
     # Keep main thread running
     try:
