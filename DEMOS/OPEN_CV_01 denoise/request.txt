@@ -8,3 +8,12 @@ labas as noriu kad sukurtum programa python kalba kuri rodytų kameros vaizda na
 
 I want to make my robot got to each point then notify the camera thread to store the colour data (color = f"Color: {closest_color}" ) into a 3x3 array and print the resulting data of the array to the log 
 after the for loop finishers in the robot_movement_thread find the best solution to this problem an generate full code:
+
+
+
+labas as noriu kad sukurtum programa python kalba kuri rodytų kameros vaizda naudojant opencv kad rodytu vaizda per visa ekrana, .py faila sukurk dabartiniame darbalaukyje, atsakymus rasyk lietuviu kalba
+
+
+pridek prie kodo funkcija kuri atpazintu raudona melyna ir zalia spalvas apskritimais, kuriuos matys kamera
+
+now add a sliders that would pop-up in a different window for the colour detection like hue range and contrast
