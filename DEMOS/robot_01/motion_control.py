@@ -52,4 +52,5 @@ if __name__ == '__main__':
         print("GetPose")
         angle_data = dashboard.GetPose()
         print(angle_data)
+        #Komentas55
   
