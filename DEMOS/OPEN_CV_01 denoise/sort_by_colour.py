@@ -3,6 +3,7 @@ import sys
 import os
 import cv2
 import numpy as np
+import keyboard  # Added for keyboard input detection
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from time import sleep
 from robot_control_001 import ConnectRobot, RunPoint, WaitArrive, GetFeed, ClearRobotError, true_camPointXY
@@ -141,7 +142,9 @@ def robot_movement_thread(dashboard, move, camera_ready_event, stop_event, share
             move.MovL(target_point[0], target_point[1], target_point[2], target_point[3])
             WaitArrive(target_point)
             print(f"Arrived at position ({x}, {y})")
-            
+            if x == 0 and y == 0:
+                keyboard.wait('s')
+
             # Set grid position and request capture
             with shared_state['grid_lock']:
                 shared_state['current_grid_pos'] = (x, y)
